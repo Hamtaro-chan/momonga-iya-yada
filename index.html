@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>momonga.py · Python-Powered ASCII Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pyodide: Runs the REAL momonga.py directly in the browser via WebAssembly -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #030305;
+      color: #e4e4e7;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow-x: hidden;
+    }
+    .font-mono-code {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-variant-ligatures: none;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0d0f14; }
+    ::-webkit-scrollbar-thumb { background: #272b3a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b4259; }
+    .code-line {
+      display: flex;
+      padding: 1px 12px 1px 0;
+      line-height: 1.45;
+      font-size: 12.2px;
+      white-space: pre;
+      transition: background-color 0.1s ease;
+    }
+    .code-line.active-line {
+      background-color: rgba(56, 189, 248, 0.16);
+      border-left: 2px solid #38bdf8;
+    }
+    .line-num {
+      width: 46px;
+      min-width: 46px;
+      text-align: right;
+      padding-right: 14px;
+      color: #4b5563;
+      user-select: none;
+    }
+    .code-text { user-select: text; }
+    .syn-kw  { color: #c678dd; }
+    .syn-fn  { color: #61afef; }
+    .syn-str { color: #98c379; }
+    .syn-num { color: #d19a66; }
+    .syn-cmt { color: #5c6370; font-style: italic; }
+
+    .reel-container {
+      max-width: 550px;
+      margin: 0 auto;
+      border-left: 1px solid #1f2430;
+      border-right: 1px solid #1f2430;
+      background: #050507;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.92);
+    }
+    .wide-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      background: #050507;
+    }
+    input[type="range"] { accent-color: #38bdf8; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#030305]">
+
+  <!-- Top Controls Header -->
+  <header class="w-full bg-[#0c0e14]/95 border-b border-[#1f2430] px-4 py-2.5 sticky top-0 z-30 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-sky-300 font-mono-code font-bold text-sm">
+          モ
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-mono-code font-bold text-sm text-white tracking-tight">momonga.py</h1>
+            <span id="runtimeBadge" class="text-[11px] font-mono-code px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              Loading Python (Pyodide)...
+            </span>
+          </div>
+          <p class="text-xs text-zinc-400">Drawn 100% by Python (<code class="text-sky-300">momonga.py</code>) · Canvas rendered by JS</p>
+        </div>
+      </div>
+
+      <!-- Scene / Mode Selector Buttons -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center bg-[#141822] p-0.5 rounded-lg border border-[#262b3d] text-xs">
+          <button data-mode="auto" class="mode-btn px-2.5 py-1 rounded-md font-medium bg-sky-500 text-slate-950 transition">
+            Auto (Front Dance ➔ Iyayada)
+          </button>
+          <button data-mode="scene1_front" class="mode-btn px-2.5 py-1 rounded-md font-medium text-zinc-300 hover:text-white transition">
+            1. Front Dance
+          </button>
+          <button data-mode="scene2_iyayada" class="mode-btn px-2.5 py-1 rounded-md font-medium text-zinc-300 hover:text-white transition">
+            2. Iyayada Tail Wag
+          </button>
+          <button data-mode="lathe_profile" class="mode-btn px-2.5 py-1 rounded-md font-medium text-zinc-300 hover:text-white transition">
+            3. Body Profile Lathe
+          </button>
+        </div>
+
+        <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-pink-500/15 hover:bg-pink-500/25 text-pink-300 border border-pink-500/30 cursor-pointer transition" title="Optional: Load an external audio file (.mp3/.wav) to sync with the dance">
+          <span>🎵</span>
+          <span id="customAudioName">Load Audio File</span>
+          <input id="inputAudioFile" type="file" accept="audio/*,video/*" class="hidden" />
+        </label>
+
+        <button id="btnAudio" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#141822] hover:bg-[#1c2230] text-zinc-200 border border-[#262b3d] transition">
+          <span id="audioIcon">🔊</span>
+          <span id="audioLabel">Mute Audio</span>
+        </button>
+
+        <button id="btnCopyCode" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition">
+          <span>📋</span>
+          <span>Copy momonga.py</span>
+        </button>
+        <a href="./momonga.py" download="momonga.py" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-slate-950 transition shadow-sm">
+          <span>⬇️</span>
+          <span>momonga.py</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Parameter Strip -->
+  <section class="w-full bg-[#090b10] border-b border-[#181c26] px-4 py-2">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs">
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="flex items-center gap-2">
+          <span class="text-zinc-400 font-mono-code">Scene:</span>
+          <span id="sceneStatusBadge" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-medium">
+            Initializing Python Runtime...
+          </span>
+        </div>
+
+        <label class="flex items-center gap-2 text-zinc-300">
+          <span class="text-zinc-400 font-mono-code">Bounce:</span>
+          <input id="sliderBounce" type="range" min="0.4" max="1.6" step="0.05" value="1.0" class="w-20 h-1.5 bg-zinc-700 rounded-lg cursor-pointer">
+          <span id="valBounce" class="font-mono-code text-sky-400 w-8">1.00</span>
+        </label>
+
+        <label class="flex items-center gap-2 text-zinc-300">
+          <span class="text-zinc-400 font-mono-code">Speed:</span>
+          <input id="sliderSpeed" type="range" min="0.4" max="1.8" step="0.1" value="1.0" class="w-20 h-1.5 bg-zinc-700 rounded-lg cursor-pointer">
+          <span id="valSpeed" class="font-mono-code text-sky-400 w-8">1.0x</span>
+        </label>
+
+        <button id="btnRestart" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium transition">
+          ↺ Restart (t=0.0s)
+        </button>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button id="btnLayout" class="hidden md:inline-flex items-center gap-1 text-zinc-400 hover:text-white transition">
+          <span>📱</span>
+          <span id="layoutLabel">Switch to Wide View</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Reel Split-Screen Container -->
+  <main id="mainContainer" class="reel-container flex-1 flex flex-col w-full">
+
+    <!-- TOP PANE: Canvas Display (Paints the ASCII Grid computed by momonga.py) -->
+    <div id="terminalPane" class="relative w-full bg-[#050507] flex flex-col justify-between overflow-hidden select-none" style="min-height: 520px;">
+
+      <!-- Top Terminal HUD -->
+      <div class="w-full px-4 pt-3 pb-1 flex items-start justify-between font-mono-code text-[12px] leading-snug z-10 pointer-events-none">
+        <div class="space-y-0.5">
+          <div class="text-zinc-200 font-medium tracking-wide">
+            momonga.py <span class="text-zinc-500">·</span> <span class="text-zinc-300">ascii</span>
+          </div>
+          <div class="flex items-center gap-6 text-zinc-400">
+            <span>rotation <span id="hudRotation" class="text-zinc-300">0.00°</span></span>
+            <span id="hudPhase" class="text-zinc-300">loading</span>
+          </div>
+          <div class="text-zinc-400">
+            letters <span id="hudLetters" class="text-zinc-300">0</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 text-zinc-300">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>t <span id="hudTime">00.00</span>s</span>
+        </div>
+      </div>
+
+      <!-- Canvas + Loading / Local File Picker Overlay -->
+      <div class="relative flex-1 flex items-center justify-center w-full overflow-hidden">
+        <canvas id="asciiCanvas" width="960" height="840" class="w-full h-auto max-h-[560px] object-contain"></canvas>
+
+        <!-- Status Overlay (Shown while Pyodide loads or if opened via file://) -->
+        <div id="statusOverlay" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#050507]/95 px-6 text-center z-20">
+          <div id="loadingSpinner" class="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+          <p id="statusTitle" class="font-mono-code text-sm text-zinc-200">Booting Python 3.12 (Pyodide)...</p>
+          <p id="statusDetail" class="text-xs text-zinc-400 max-w-sm">
+            Loading <code class="text-sky-300">./momonga.py</code> so Python draws Momonga directly in your browser.
+          </p>
+          <label id="btnPickPy" class="hidden mt-2 items-center gap-2 px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs cursor-pointer transition">
+            <span>📂 Select momonga.py from your computer</span>
+            <input id="inputPyFile" type="file" accept=".py" class="hidden" />
+          </label>
+        </div>
+
+        <!-- Center Play/Pause Overlay -->
+        <div id="reelOverlay" class="absolute inset-0 flex flex-col items-center justify-center gap-3 opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/10">
+          <button id="btnCenterPlay" class="w-14 h-14 rounded-full bg-zinc-900/80 border border-zinc-700/70 text-white flex items-center justify-center shadow-lg hover:scale-105 transition" title="Play / Pause">
+            <span id="centerPlayIcon" class="text-xl">⏸</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MIDDLE DIVIDER BAR -->
+    <div class="w-full bg-[#171921] border-y border-[#262a36] px-4 py-1.5 flex items-center justify-between font-mono-code text-xs">
+      <div class="flex items-center gap-3">
+        <span class="text-zinc-200 font-medium">momonga.py</span>
+        <span id="activeFnBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
+          loading...
+        </span>
+      </div>
+      <div class="flex items-center gap-2 text-zinc-300">
+        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+        <span>python · <span id="hudFps">30</span> fps</span>
+      </div>
+    </div>
+
+    <!-- BOTTOM PANE: Displays the EXACT momonga.py currently executing -->
+    <div id="editorPane" class="relative w-full bg-[#0d0f14] h-[300px] overflow-y-auto font-mono-code">
+      <div id="codeContainer" class="py-2"></div>
+    </div>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 bg-emerald-500 text-slate-950 font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    Copied!
+  </div>
+
+  <script>
+    /*************************************************************************
+     * THIN JAVASCRIPT RENDERER (ZERO Momonga Drawing Logic in JS!)
+     * 1. Loads Pyodide (Python 3.12 WebAssembly)
+     * 2. Loads & executes the REAL `./momonga.py`
+     * 3. Calls Python's `render_frame_grid(t, COLS, ROWS, mode, bounce)`
+     * 4. Paints the returned ASCII characters & palette colors onto <canvas>
+     *************************************************************************/
+    const COLS = 124;
+    const ROWS = 76;
+    const canvas = document.getElementById('asciiCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const CELL_W = canvas.width / COLS;
+    const CELL_H = canvas.height / ROWS;
+
+    const hudRotation = document.getElementById('hudRotation');
+    const hudPhase = document.getElementById('hudPhase');
+    const hudLetters = document.getElementById('hudLetters');
+    const hudTime = document.getElementById('hudTime');
+    const hudFps = document.getElementById('hudFps');
+    const sceneStatusBadge = document.getElementById('sceneStatusBadge');
+    const activeFnBadge = document.getElementById('activeFnBadge');
+    const runtimeBadge = document.getElementById('runtimeBadge');
+    const statusOverlay = document.getElementById('statusOverlay');
+    const statusTitle = document.getElementById('statusTitle');
+    const statusDetail = document.getElementById('statusDetail');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const btnPickPy = document.getElementById('btnPickPy');
+
+    const codeContainer = document.getElementById('codeContainer');
+    const editorPane = document.getElementById('editorPane');
+    let lineEls = [];
+    let fnLineMap = {};
+    let loadedPythonSource = '';
+    let pyodide = null;
+    let pyRenderFn = null;
+    let PALETTE_HEX = [];
+
+    // State
+    let currentMode = 'auto';
+    let bounceScale = 1.0;
+    let speedMult = 1.0;
+    let isPlaying = true;
+    let simTime = 0.0;
+    let lastTime = performance.now();
+    let fpsFrames = 0;
+    let fpsLastCheck = performance.now();
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 2600);
+    }
+
+    function highlightPy(text) {
+      let esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (esc.trim().startsWith('#')) return `<span class="syn-cmt">${esc}</span>`;
+      const cmtIdx = esc.indexOf('#');
+      let mainPart = cmtIdx >= 0 ? esc.slice(0, cmtIdx) : esc;
+      const cmtPart = cmtIdx >= 0 ? `<span class="syn-cmt">${esc.slice(cmtIdx)}</span>` : '';
+      mainPart = mainPart.replace(/("""[\s\S]*?"""|"[^"]*"|'[^']*')/g, '<span class="syn-str">$1</span>');
+      mainPart = mainPart.replace(/\b(def|class|return|if|elif|else|for|while|in|not|and|or|continue|pass|import|from|try|except|finally)\b/g, '<span class="syn-kw">$1</span>');
+      mainPart = mainPart.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="syn-num">$1</span>');
+      mainPart = mainPart.replace(/\b(render_frame_grid|render_frame_ansi|evaluate_timeline|draw_momonga_front_pose|draw_momonga_side_profile_exact|draw_momonga_back_left_wag|draw_curved_plume_tail|fill_ellipse|stroke_line|stroke_curve)\b/g, '<span class="syn-fn">$1</span>');
+      return mainPart + cmtPart;
+    }
+
+    function displayRealPythonSource(pyText) {
+      loadedPythonSource = pyText;
+      const rawLines = pyText.replace(/\r\n/g, '\n').split('\n');
+      codeContainer.innerHTML = '';
+      lineEls = [];
+      fnLineMap = {};
+
+      rawLines.forEach((text, idx) => {
+        const match = text.match(/^(def\s+[a-zA-Z0-9_]+)\(/);
+        if (match) fnLineMap[match[1] + '()'] = idx;
+
+        const row = document.createElement('div');
+        row.className = 'code-line cursor-pointer hover:bg-white/5';
+        row.innerHTML = `<span class="line-num">${idx + 1}</span><span class="code-text">${highlightPy(text)}</span>`;
+        row.addEventListener('click', () => setActiveLine(idx, false));
+        codeContainer.appendChild(row);
+        lineEls.push(row);
+      });
+    }
+
+    let activeLineIdx = -1;
+    function setActiveLine(idx, scroll = true) {
+      if (lineEls.length === 0 || idx === activeLineIdx || idx < 0 || idx >= lineEls.length) return;
+      if (activeLineIdx >= 0 && lineEls[activeLineIdx]) lineEls[activeLineIdx].classList.remove('active-line');
+      activeLineIdx = idx;
+      const el = lineEls[idx];
+      el.classList.add('active-line');
+      if (scroll) {
+        const target = el.offsetTop - editorPane.clientHeight * 0.35;
+        editorPane.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+      }
+    }
+
+    // Boot Python source into Pyodide
+    async function mountMomongaPython(pyText) {
+      statusTitle.textContent = 'Compiling momonga.py in Python...';
+      displayRealPythonSource(pyText);
+
+      // Run momonga.py as a module inside Pyodide (so `if __name__ == "__main__":` does not block)
+      pyodide.FS.writeFile('/momonga.py', pyText);
+      await pyodide.runPythonAsync(`
+import sys, importlib
+if '/' not in sys.path:
+    sys.path.insert(0, '/')
+import momonga
+importlib.reload(momonga)
+
+def _web_step(t, cols, rows, mode, bounce):
+    chars, colors, meta = momonga.render_frame_grid(t, cols, rows, mode, bounce)
+    return (
+        bytes(chars),
+        bytes(colors),
+        float(meta['rotDeg']),
+        str(meta['phaseName']),
+        str(meta['sceneLabel']),
+        str(meta['activeFn']),
+        int(meta['letters']),
+    )
+`);
+      PALETTE_HEX = pyodide.runPython('momonga.PALETTE_HEX').toJs();
+      pyRenderFn = pyodide.globals.get('_web_step');
+
+      runtimeBadge.textContent = 'Python 3.12 · Running ./momonga.py';
+      runtimeBadge.className = 'text-[11px] font-mono-code px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+      statusOverlay.classList.add('hidden');
+      simTime = 0.0;
+      lastTime = performance.now();
+      requestAnimationFrame(animate);
+    }
+
+    async function initPyodideApp() {
+      try {
+        pyodide = await loadPyodide();
+        statusTitle.textContent = 'Fetching ./momonga.py...';
+        let pyText = null;
+        for (const candidate of ['./momonga.py', './momongy.py']) {
+          const res = await fetch(candidate);
+          if (res.ok) {
+            pyText = await res.text();
+            break;
+          }
+        }
+        if (!pyText) throw new Error('Could not fetch ./momonga.py');
+        await mountMomongaPython(pyText);
+      } catch (err) {
+        // Most common cause: user double-clicked index.html via file:// (browser CORS blocks fetch)
+        loadingSpinner.classList.add('hidden');
+        statusTitle.textContent = 'Select momonga.py to run locally';
+        statusDetail.innerHTML =
+          'Opened via <code class="text-amber-300">file://</code> (browsers block auto-fetching local files). ' +
+          'Pick <code class="text-sky-300">momonga.py</code> below, run <code class="text-emerald-300">python momonga.py --web</code> for instant auto-load, or host on GitHub Pages.';
+        btnPickPy.classList.remove('hidden');
+        btnPickPy.classList.add('inline-flex');
+      }
+    }
+    initPyodideApp();
+
+    // Local file picker fallback for file:// mode
+    document.getElementById('inputPyFile').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file || !pyodide) return;
+      const pyText = await file.text();
+      loadingSpinner.classList.remove('hidden');
+      btnPickPy.classList.add('hidden');
+      await mountMomongaPython(pyText);
+    });
+
+    // Paint the Python-computed ASCII grid onto HTML5 <canvas>
+    function paintFromPython(t) {
+      if (!pyRenderFn) return;
+
+      const pyResult = pyRenderFn(t, COLS, ROWS, currentMode, bounceScale);
+      const [charsBuf, colorsBuf, rotDeg, phaseName, sceneLabel, activeFn, letters] = pyResult.toJs();
+      pyResult.destroy();
+
+      ctx.fillStyle = '#050507';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '600 11.4px "JetBrains Mono", monospace';
+      ctx.textBaseline = 'top';
+
+      let lastColor = -1;
+      for (let r = 2; r < ROWS - 1; r++) {
+        const rowOff = r * COLS;
+        const y = r * CELL_H;
+        for (let c = 1; c < COLS - 1; c++) {
+          const idx = rowOff + c;
+          const colIdx = colorsBuf[idx];
+          if (colIdx === 0) continue;
+          const chCode = charsBuf[idx];
+          if (chCode === 32) continue;
+          if (colIdx !== lastColor) {
+            ctx.fillStyle = PALETTE_HEX[colIdx];
+            lastColor = colIdx;
+          }
+          ctx.fillText(String.fromCharCode(chCode), c * CELL_W, y);
+        }
+      }
+
+      hudRotation.textContent = `${rotDeg.toFixed(2)}°`;
+      hudPhase.textContent = phaseName;
+      hudLetters.textContent = letters.toLocaleString();
+      hudTime.textContent = (t % 99.99).toFixed(2).padStart(5, '0');
+      sceneStatusBadge.textContent = sceneLabel;
+      activeFnBadge.textContent = activeFn;
+
+      if (fnLineMap[activeFn] !== undefined) {
+        setActiveLine(fnLineMap[activeFn], true);
+      }
+    }
+
+    // Main Animation Loop (30 FPS target to match Terminal)
+    let accum = 0;
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      if (isPlaying) {
+        simTime += dt * speedMult;
+        syncCustomAudio();
+      }
+
+      accum += dt;
+      if (accum >= 1 / 32) {
+        accum = 0;
+        paintFromPython(simTime);
+        fpsFrames++;
+        if (now - fpsLastCheck >= 1000) {
+          hudFps.textContent = fpsFrames;
+          fpsFrames = 0;
+          fpsLastCheck = now;
+        }
+      }
+    }
+
+    /*************************************************************************
+     * OPTIONAL EXTERNAL AUDIO FILE SYNC
+     *************************************************************************/
+    let isAudioOn = false;
+    let customAudioEl = null;
+
+    function syncCustomAudio() {
+      if (!customAudioEl) return;
+      if (isAudioOn && isPlaying) {
+        if (customAudioEl.paused) customAudioEl.play().catch(() => {});
+        customAudioEl.playbackRate = speedMult;
+      } else if (!customAudioEl.paused) {
+        customAudioEl.pause();
+      }
+    }
+
+    document.getElementById('inputAudioFile').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (customAudioEl) customAudioEl.pause();
+      customAudioEl = new Audio(URL.createObjectURL(file));
+      customAudioEl.loop = true;
+      document.getElementById('customAudioName').textContent = file.name.slice(0, 16);
+      const btnAudio = document.getElementById('btnAudio');
+      btnAudio.classList.remove('hidden');
+      btnAudio.classList.add('flex');
+      simTime = 0.0;
+      isAudioOn = true;
+      customAudioEl.currentTime = 0;
+      if (isPlaying) customAudioEl.play().catch(() => {});
+      showToast('Loaded ' + file.name);
+    });
+
+    document.getElementById('btnAudio').addEventListener('click', () => {
+      if (!customAudioEl) return;
+      isAudioOn = !isAudioOn;
+      syncCustomAudio();
+      document.getElementById('audioIcon').textContent = isAudioOn ? '🔊' : '🔇';
+      document.getElementById('audioLabel').textContent = isAudioOn ? 'Mute Audio' : 'Unmute Audio';
+    });
+
+    /*************************************************************************
+     * UI CONTROLS
+     *************************************************************************/
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b => {
+          b.className = 'mode-btn px-2.5 py-1 rounded-md font-medium text-zinc-300 hover:text-white transition';
+        });
+        btn.className = 'mode-btn px-2.5 py-1 rounded-md font-medium bg-sky-500 text-slate-950 transition';
+        currentMode = btn.dataset.mode;
+        if (currentMode === 'auto' || currentMode === 'scene1_front') simTime = 0.0;
+        else if (currentMode === 'scene2_iyayada') simTime = 2.15;
+        if (customAudioEl && isAudioOn) customAudioEl.currentTime = simTime % (customAudioEl.duration || 13.35);
+      });
+    });
+
+    document.getElementById('btnRestart').addEventListener('click', () => {
+      simTime = 0.0;
+      if (customAudioEl) customAudioEl.currentTime = 0;
+    });
+
+    document.getElementById('sliderBounce').addEventListener('input', e => {
+      bounceScale = parseFloat(e.target.value);
+      document.getElementById('valBounce').textContent = bounceScale.toFixed(2);
+    });
+
+    document.getElementById('sliderSpeed').addEventListener('input', e => {
+      speedMult = parseFloat(e.target.value);
+      document.getElementById('valSpeed').textContent = speedMult.toFixed(1) + 'x';
+    });
+
+    document.getElementById('btnCenterPlay').addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      document.getElementById('centerPlayIcon').textContent = isPlaying ? '⏸' : '▶';
+      syncCustomAudio();
+    });
+
+    let isWide = false;
+    document.getElementById('btnLayout').addEventListener('click', () => {
+      isWide = !isWide;
+      const mainContainer = document.getElementById('mainContainer');
+      if (isWide) {
+        mainContainer.className = 'wide-container flex-1 grid grid-cols-1 lg:grid-cols-12 w-full border-x border-[#1f2430]';
+        document.getElementById('terminalPane').className = 'relative lg:col-span-7 bg-[#050507] flex flex-col justify-between overflow-hidden select-none border-r border-[#262a36]';
+        document.getElementById('editorPane').className = 'relative lg:col-span-5 bg-[#0d0f14] h-[640px] overflow-y-auto font-mono-code';
+        document.getElementById('layoutLabel').textContent = 'Switch to Reel View';
+      } else {
+        mainContainer.className = 'reel-container flex-1 flex flex-col w-full';
+        document.getElementById('terminalPane').className = 'relative w-full bg-[#050507] flex flex-col justify-between overflow-hidden select-none';
+        document.getElementById('editorPane').className = 'relative w-full bg-[#0d0f14] h-[300px] overflow-y-auto font-mono-code';
+        document.getElementById('layoutLabel').textContent = 'Switch to Wide View';
+      }
+    });
+
+    document.getElementById('btnCopyCode').addEventListener('click', () => {
+      if (!loadedPythonSource) return;
+      navigator.clipboard.writeText(loadedPythonSource).then(() => {
+        showToast('Copied momonga.py to clipboard!');
+      });
+    });
+  </script>
+</body>
+</html>
